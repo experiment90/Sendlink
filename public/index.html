@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SnapLink</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0c0c0e;
+    --surface: #141416;
+    --surface2: #1c1c1f;
+    --border: #2a2a2f;
+    --accent: #d4ff4a;
+    --accent2: #ff6b35;
+    --text: #f0f0f0;
+    --muted: #666;
+    --radius: 12px;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow-x: hidden;
+  }
+
+  /* Ambient background */
+  body::before {
+    content: '';
+    position: fixed;
+    top: -200px; left: 50%;
+    transform: translateX(-50%);
+    width: 600px; height: 600px;
+    background: radial-gradient(circle, rgba(212,255,74,0.06) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+    z-index: 1;
+  }
+
+  .logo {
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+  }
+  .logo span { color: var(--accent); }
+
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 6px 14px;
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    transition: all 0.3s;
+  }
+  .status-pill.connected { color: var(--accent); border-color: rgba(212,255,74,0.3); }
+  .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: all 0.3s;
+  }
+  .status-pill.connected .dot {
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    padding: 24px;
+    max-width: 680px;
+    margin: 0 auto;
+    width: 100%;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Device name setup */
+  #setup-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 60vh;
+    gap: 24px;
+    text-align: center;
+  }
+
+  #setup-screen h1 {
+    font-size: clamp(32px, 8vw, 56px);
+    font-weight: 800;
+    letter-spacing: -2px;
+    line-height: 1;
+  }
+  #setup-screen h1 em { color: var(--accent); font-style: normal; }
+  #setup-screen p {
+    color: var(--muted);
+    font-size: 16px;
+    max-width: 320px;
+  }
+
+  .setup-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+    max-width: 360px;
+  }
+
+  .device-type-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+
+  .type-btn {
+    background: var(--surface);
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 8px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    color: var(--muted);
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    transition: all 0.2s;
+  }
+  .type-btn .icon { font-size: 28px; }
+  .type-btn:hover { border-color: var(--accent); color: var(--text); }
+  .type-btn.selected { border-color: var(--accent); color: var(--accent); background: rgba(212,255,74,0.06); }
+
+  input[type="text"] {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 14px;
+    width: 100%;
+    transition: border-color 0.2s;
+  }
+  input[type="text"]:focus { outline: none; border-color: var(--accent); }
+  input[type="text"]::placeholder { color: var(--muted); }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #0c0c0e;
+    border: none;
+    border-radius: var(--radius);
+    padding: 14px 24px;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 15px;
+    cursor: pointer;
+    transition: all 0.2s;
+    width: 100%;
+  }
+  .btn-primary:hover { background: #e8ff6a; transform: translateY(-1px); }
+  .btn-primary:active { transform: translateY(0); }
+
+  /* Main app */
+  #app-screen { display: none; flex-direction: column; gap: 20px; }
+  #app-screen.visible { display: flex; }
+
+  /* Devices bar */
+  .devices-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 18px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .devices-bar::-webkit-scrollbar { display: none; }
+  .devices-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; white-space: nowrap; }
+  
+  .device-chip {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 5px 12px;
+    font-size: 12px;
+    font-family: 'DM Mono', monospace;
+    white-space: nowrap;
+    animation: fadeIn 0.3s ease;
+  }
+  .device-chip .chip-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+  .device-chip .chip-icon { font-size: 14px; }
+  .no-devices { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--muted); }
+
+  /* Action tabs */
+  .tabs {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .tab {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 8px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    font-family: 'Syne', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    transition: all 0.2s;
+  }
+  .tab .tab-icon { font-size: 22px; }
+  .tab:hover { border-color: var(--accent); color: var(--text); }
+  .tab.active { border-color: var(--accent); color: var(--accent); background: rgba(212,255,74,0.06); }
+
+  /* Panels */
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    display: none;
+    flex-direction: column;
+    gap: 14px;
+    animation: slideUp 0.25s ease;
+  }
+  .panel.active { display: flex; }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .panel-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  textarea {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    width: 100%;
+    min-height: 120px;
+    resize: vertical;
+    transition: border-color 0.2s;
+  }
+  textarea:focus { outline: none; border-color: var(--accent); }
+  textarea::placeholder { color: var(--muted); }
+
+  .send-row {
+    display: flex;
+    gap: 10px;
+  }
+
+  .btn-send {
+    background: var(--accent);
+    color: #0c0c0e;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 20px;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+    flex: 1;
+    transition: all 0.2s;
+  }
+  .btn-send:hover { background: #e8ff6a; }
+  .btn-send:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .btn-paste {
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-family: 'Syne', sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-paste:hover { border-color: var(--accent); }
+
+  /* File drop */
+  .drop-zone {
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 40px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+  }
+  .drop-zone:hover, .drop-zone.dragover {
+    border-color: var(--accent);
+    background: rgba(212,255,74,0.04);
+  }
+  .drop-zone input[type="file"] {
+    position: absolute; inset: 0;
+    opacity: 0; cursor: pointer; width: 100%;
+  }
+  .drop-zone .dz-icon { font-size: 36px; margin-bottom: 10px; }
+  .drop-zone p { color: var(--muted); font-size: 14px; }
+  .drop-zone strong { color: var(--text); }
+
+  /* Feed / history */
+  .feed { display: flex; flex-direction: column; gap: 10px; max-height: 340px; overflow-y: auto; }
+  .feed::-webkit-scrollbar { width: 4px; }
+  .feed::-webkit-scrollbar-track { background: transparent; }
+  .feed::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .feed-item {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    animation: fadeIn 0.3s ease;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .feed-item-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+  }
+  .feed-item-from { color: var(--accent); font-weight: 500; }
+  .feed-item-content {
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    word-break: break-all;
+    white-space: pre-wrap;
+    max-height: 80px;
+    overflow: hidden;
+    position: relative;
+  }
+  .feed-item-content.truncated::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 30px;
+    background: linear-gradient(transparent, var(--surface2));
+  }
+  .feed-item-actions { display: flex; gap: 8px; }
+  .btn-copy, .btn-download {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-family: 'Syne', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-copy:hover, .btn-download:hover { border-color: var(--accent); color: var(--accent); }
+
+  .feed-empty {
+    text-align: center;
+    padding: 32px;
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .feed-empty .feed-empty-icon { font-size: 32px; margin-bottom: 8px; }
+
+  /* Toast */
+  #toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: var(--accent);
+    color: #0c0c0e;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    padding: 12px 24px;
+    border-radius: 999px;
+    z-index: 999;
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    pointer-events: none;
+    white-space: nowrap;
+  }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* Connection screen */
+  #connect-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 60vh;
+    gap: 16px;
+    text-align: center;
+  }
+  .spinner {
+    width: 40px; height: 40px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #connect-screen p { color: var(--muted); font-family: 'DM Mono', monospace; font-size: 13px; }
+
+  /* File item in feed */
+  .file-feed-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .file-icon-big { font-size: 32px; }
+  .file-info { flex: 1; min-width: 0; }
+  .file-name { font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .file-size { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Snap<span>Link</span></div>
+  <div class="status-pill" id="status-pill">
+    <div class="dot"></div>
+    <span id="status-text">Connecting…</span>
+  </div>
+</header>
+
+<main>
+  <!-- Connecting -->
+  <div id="connect-screen">
+    <div class="spinner"></div>
+    <p>Connecting to SnapLink…</p>
+  </div>
+
+  <!-- Setup -->
+  <div id="setup-screen" style="display:none">
+    <div>
+      <h1>You're <em>one click</em> away.</h1>
+    </div>
+    <p>Name this device so others on your network can identify it.</p>
+    <div class="setup-form">
+      <div class="device-type-grid">
+        <button class="type-btn selected" data-type="desktop" onclick="selectType(this)">
+          <span class="icon">💻</span> Laptop
+        </button>
+        <button class="type-btn" data-type="mobile" onclick="selectType(this)">
+          <span class="icon">📱</span> Phone
+        </button>
+        <button class="type-btn" data-type="tablet" onclick="selectType(this)">
+          <span class="icon">⬛</span> Tablet
+        </button>
+      </div>
+      <input type="text" id="device-name-input" placeholder="e.g. My MacBook" maxlength="24" />
+      <button class="btn-primary" onclick="registerDevice()">Join Network →</button>
+    </div>
+  </div>
+
+  <!-- Main App -->
+  <div id="app-screen">
+    <!-- Connected devices -->
+    <div class="devices-bar">
+      <span class="devices-label">Online</span>
+      <div id="device-list"><span class="no-devices">No other devices yet</span></div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('clipboard', this)">
+        <span class="tab-icon">📋</span> Clipboard
+      </button>
+      <button class="tab" onclick="switchTab('files', this)">
+        <span class="tab-icon">📁</span> Files
+      </button>
+      <button class="tab" onclick="switchTab('history', this)">
+        <span class="tab-icon">🕒</span> History
+      </button>
+    </div>
+
+    <!-- Clipboard Panel -->
+    <div class="panel active" id="panel-clipboard">
+      <div class="panel-title">Send to all devices</div>
+      <textarea id="clip-input" placeholder="Paste or type anything — link, code, note…"></textarea>
+      <div class="send-row">
+        <button class="btn-paste" onclick="pasteFromClipboard()">⌘ Paste</button>
+        <button class="btn-send" onclick="sendClipboard()">Send →</button>
+      </div>
+    </div>
+
+    <!-- Files Panel -->
+    <div class="panel" id="panel-files">
+      <div class="panel-title">Send a file</div>
+      <div class="drop-zone" id="drop-zone">
+        <input type="file" id="file-input" onchange="handleFileSelect(this)" multiple>
+        <div class="dz-icon">📤</div>
+        <p><strong>Drop files here</strong> or click to browse</p>
+        <p style="font-size:12px;margin-top:4px">Any file type · Up to 50MB</p>
+      </div>
+    </div>
+
+    <!-- History Panel -->
+    <div class="panel" id="panel-history">
+      <div class="panel-title">Received</div>
+      <div class="feed" id="feed">
+        <div class="feed-empty">
+          <div class="feed-empty-icon">📭</div>
+          <p>Nothing yet. Send something from another device.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div id="toast"></div>
+
+<script>
+let ws;
+let myDeviceId = null;
+let myDeviceName = localStorage.getItem('snaplink_name') || '';
+let myDeviceType = localStorage.getItem('snaplink_type') || 'desktop';
+let feedItems = [];
+
+function getWsUrl() {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${proto}//${location.host}`;
+}
+
+function connect() {
+  ws = new WebSocket(getWsUrl());
+
+  ws.onopen = () => {
+    setStatus(true);
+  };
+
+  ws.onclose = () => {
+    setStatus(false);
+    setTimeout(connect, 2000);
+  };
+
+  ws.onmessage = (e) => {
+    const data = JSON.parse(e.data);
+    handleMessage(data);
+  };
+}
+
+function handleMessage(data) {
+  switch (data.type) {
+    case 'welcome':
+      myDeviceId = data.deviceId;
+      document.getElementById('connect-screen').style.display = 'none';
+
+      if (myDeviceName) {
+        // Auto-register and go straight to app
+        sendRegister();
+        showApp();
+      } else {
+        // Show setup
+        document.getElementById('setup-screen').style.display = 'flex';
+        // Pre-fill device name
+        const defaultName = getDefaultName();
+        document.getElementById('device-name-input').value = defaultName;
+      }
+      break;
+
+    case 'device_list':
+      updateDeviceList(data.devices);
+      break;
+
+    case 'clipboard':
+    case 'note':
+      addFeedItem({
+        type: 'text',
+        content: data.content,
+        from: data.from,
+        timestamp: data.timestamp
+      });
+      showToast(`📋 Clipboard from ${data.from}`);
+      switchTab('history', document.querySelector('.tab:last-child'));
+      break;
+
+    case 'file':
+      addFeedItem({
+        type: 'file',
+        name: data.name,
+        mimeType: data.mimeType,
+        fileData: data.data,
+        size: data.size,
+        from: data.from,
+        timestamp: data.timestamp
+      });
+      showToast(`📁 File from ${data.from}`);
+      switchTab('history', document.querySelector('.tab:last-child'));
+      break;
+  }
+}
+
+function setStatus(connected) {
+  const pill = document.getElementById('status-pill');
+  const text = document.getElementById('status-text');
+  if (connected) {
+    pill.className = 'status-pill connected';
+    text.textContent = 'Connected';
+  } else {
+    pill.className = 'status-pill';
+    text.textContent = 'Reconnecting…';
+  }
+}
+
+function getDefaultName() {
+  const ua = navigator.userAgent;
+  if (/iPhone/.test(ua)) return 'iPhone';
+  if (/iPad/.test(ua)) return 'iPad';
+  if (/Android/.test(ua)) return 'Android Device';
+  if (/Mac/.test(ua)) return 'MacBook';
+  if (/Windows/.test(ua)) return 'Windows PC';
+  return 'My Device';
+}
+
+function selectType(el) {
+  document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('selected'));
+  el.classList.add('selected');
+  myDeviceType = el.dataset.type;
+}
+
+function registerDevice() {
+  const nameInput = document.getElementById('device-name-input');
+  const name = nameInput.value.trim() || getDefaultName();
+  myDeviceName = name;
+  localStorage.setItem('snaplink_name', name);
+  localStorage.setItem('snaplink_type', myDeviceType);
+  sendRegister();
+  document.getElementById('setup-screen').style.display = 'none';
+  showApp();
+}
+
+function sendRegister() {
+  send({ type: 'register', name: myDeviceName, deviceType: myDeviceType });
+}
+
+function showApp() {
+  document.getElementById('app-screen').classList.add('visible');
+}
+
+function send(data) {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify(data));
+  }
+}
+
+function sendClipboard() {
+  const content = document.getElementById('clip-input').value.trim();
+  if (!content) return;
+  send({ type: 'clipboard', content });
+  document.getElementById('clip-input').value = '';
+  showToast('✓ Sent to all devices');
+}
+
+async function pasteFromClipboard() {
+  try {
+    const text = await navigator.clipboard.readText();
+    document.getElementById('clip-input').value = text;
+  } catch {
+    showToast('⚠ Clipboard access denied');
+  }
+}
+
+function handleFileSelect(input) {
+  Array.from(input.files).forEach(sendFile);
+  input.value = '';
+}
+
+function sendFile(file) {
+  if (file.size > 50 * 1024 * 1024) {
+    showToast('⚠ File too large (max 50MB)');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const base64 = e.target.result.split(',')[1];
+    send({
+      type: 'file',
+      name: file.name,
+      mimeType: file.type,
+      data: base64,
+      size: file.size
+    });
+    showToast(`📁 Sent: ${file.name}`);
+  };
+  reader.readAsDataURL(file);
+}
+
+// Drag & drop
+const dropZone = document.getElementById('drop-zone');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  Array.from(e.dataTransfer.files).forEach(sendFile);
+});
+
+function updateDeviceList(devices) {
+  const list = document.getElementById('device-list');
+  const others = devices.filter(d => d.id !== myDeviceId);
+  if (others.length === 0) {
+    list.innerHTML = '<span class="no-devices">No other devices yet</span>';
+    return;
+  }
+  const icons = { desktop: '💻', mobile: '📱', tablet: '⬛', unknown: '🔲' };
+  list.innerHTML = others.map(d => `
+    <div class="device-chip">
+      <div class="chip-dot"></div>
+      <span class="chip-icon">${icons[d.type] || '🔲'}</span>
+      <span>${d.name}</span>
+    </div>
+  `).join('');
+}
+
+function addFeedItem(item) {
+  feedItems.unshift(item);
+  renderFeed();
+}
+
+function renderFeed() {
+  const feed = document.getElementById('feed');
+  if (feedItems.length === 0) {
+    feed.innerHTML = `<div class="feed-empty"><div class="feed-empty-icon">📭</div><p>Nothing yet.</p></div>`;
+    return;
+  }
+  feed.innerHTML = feedItems.map((item, i) => {
+    const time = new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    if (item.type === 'text') {
+      const preview = item.content.length > 200 ? item.content.substring(0, 200) + '…' : item.content;
+      return `
+        <div class="feed-item">
+          <div class="feed-item-meta">
+            <span class="feed-item-from">↓ ${item.from}</span>
+            <span>${time}</span>
+          </div>
+          <div class="feed-item-content">${escapeHtml(preview)}</div>
+          <div class="feed-item-actions">
+            <button class="btn-copy" onclick="copyFeedItem(${i})">Copy</button>
+          </div>
+        </div>`;
+    } else {
+      const sizeStr = formatBytes(item.size);
+      return `
+        <div class="feed-item">
+          <div class="feed-item-meta">
+            <span class="feed-item-from">↓ ${item.from}</span>
+            <span>${time}</span>
+          </div>
+          <div class="file-feed-item">
+            <span class="file-icon-big">${getFileIcon(item.mimeType)}</span>
+            <div class="file-info">
+              <div class="file-name">${escapeHtml(item.name)}</div>
+              <div class="file-size">${sizeStr}</div>
+            </div>
+          </div>
+          <div class="feed-item-actions">
+            <button class="btn-download" onclick="downloadFile(${i})">⬇ Download</button>
+          </div>
+        </div>`;
+    }
+  }).join('');
+}
+
+async function copyFeedItem(i) {
+  try {
+    await navigator.clipboard.writeText(feedItems[i].content);
+    showToast('✓ Copied to clipboard');
+  } catch {
+    showToast('⚠ Could not copy');
+  }
+}
+
+function downloadFile(i) {
+  const item = feedItems[i];
+  const a = document.createElement('a');
+  a.href = `data:${item.mimeType};base64,${item.fileData}`;
+  a.download = item.name;
+  a.click();
+}
+
+function switchTab(name, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  if (el) el.classList.add('active');
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById(`panel-${name}`).classList.add('active');
+}
+
+let toastTimer;
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove('show'), 2200);
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function formatBytes(bytes) {
+  if (!bytes) return '';
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+function getFileIcon(mime) {
+  if (!mime) return '📄';
+  if (mime.startsWith('image/')) return '🖼';
+  if (mime.startsWith('video/')) return '🎬';
+  if (mime.startsWith('audio/')) return '🎵';
+  if (mime.includes('pdf')) return '📕';
+  if (mime.includes('zip') || mime.includes('archive')) return '🗜';
+  if (mime.includes('text')) return '📝';
+  return '📄';
+}
+
+// Handle Enter key in textarea with Cmd/Ctrl
+document.getElementById('clip-input')?.addEventListener('keydown', e => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') sendClipboard();
+});
+
+connect();
+</script>
+</body>
+</html>
